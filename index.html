@@ -35,7 +35,7 @@
 
     <!-- 部位別 -->
     <section id="view-summary" class="view">
-      <p class="hint">部位ごとの施術回数・最終施術日・次回目安日です（左右は別々に集計）。</p>
+      <p class="hint">部位ごとの照射回数・前回の照射日とレベル・次回目安日です（左右は別々に集計）。</p>
       <div id="summary-table"></div>
     </section>
 
@@ -44,6 +44,7 @@
       <div class="card">
         <h3>次回目安の間隔</h3>
         <label class="row">前回から <input id="interval-input" type="number" min="1" max="365"> 日後</label>
+        <p class="hint">家庭用脱毛器は最初の数か月は1〜2週間に1回、毛が減ってきたら間隔をあけるのが一般的です。お使いの機種の説明書に合わせて設定してください。</p>
       </div>
       <div class="card">
         <h3>部位の管理</h3>
@@ -72,10 +73,11 @@
     <form id="record-form" method="dialog">
       <h2 id="dialog-title">記録</h2>
       <label class="row">日付 <input id="record-date" type="date" required></label>
-      <label class="row">サロン・クリニック <input id="record-place" type="text" placeholder="任意"></label>
+      <label class="row">脱毛器 <input id="record-device" type="text" placeholder="機種名（任意）"></label>
       <div class="side-legend">左右のある部位は「左」「右」をそれぞれ選べます（両方選ぶと両側）。</div>
       <div id="part-picker" class="part-picker"></div>
-      <label class="block">メモ <textarea id="record-memo" rows="2" placeholder="出力・痛み・肌の状態など"></textarea></label>
+      <div id="level-inputs" class="level-inputs"></div>
+      <label class="block">メモ <textarea id="record-memo" rows="2" placeholder="痛み・肌の状態・ケアなど"></textarea></label>
       <div class="dialog-actions">
         <button type="button" id="delete-record" class="danger">削除</button>
         <span class="spacer"></span>

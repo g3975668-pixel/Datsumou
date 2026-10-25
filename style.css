@@ -199,3 +199,10 @@ td .side-tag.R { color: var(--right); }
   .day { min-height: 64px; padding: 3px; }
   .chip { font-size: 0.6rem; padding: 0 3px; }
 }
+
+/* 出力レベル */
+.lv { color: var(--muted); font-size: 0.9em; }
+.level-inputs { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.level-inputs h4 { width: 100%; margin: 0; font-size: 0.85rem; color: var(--muted); }
+.level-row { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+.level-row input { width: 4.5em; padding: 3px 6px; }

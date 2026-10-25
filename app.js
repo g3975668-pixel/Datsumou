@@ -23,7 +23,7 @@ function defaultState() {
   for (const [group, items] of DEFAULT_PARTS) {
     for (const [name, paired] of items) parts.push({ id: uid(), name, group, paired, archived: false });
   }
-  return { version: 1, intervalDays: 56, parts, records: [] };
+  return { version: 2, intervalDays: 14, parts, records: [] };
 }
 
 function loadState() {
@@ -31,12 +31,25 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const s = JSON.parse(raw);
-      if (s && Array.isArray(s.parts) && Array.isArray(s.records)) return s;
+      if (s && Array.isArray(s.parts) && Array.isArray(s.records)) return migrate(s);
     }
   } catch (e) {
     console.warn('データの読み込みに失敗しました', e);
   }
   return defaultState();
+}
+
+// v1（サロン向け）→ v2（家庭用脱毛器向け）
+function migrate(s) {
+  if ((s.version || 1) < 2) {
+    if (s.intervalDays === 56) s.intervalDays = 14;
+    for (const r of s.records) {
+      if (r.place && !r.device) r.device = r.place;
+      delete r.place;
+    }
+    s.version = 2;
+  }
+  return s;
 }
 
 let state = loadState();
@@ -91,12 +104,13 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-function itemChip(item) {
+function itemChip(item, withLevel = false) {
   const part = partById(item.partId);
   const name = part ? part.name : '(不明な部位)';
   return el('span', { class: `chip ${item.side}` },
     item.side !== 'N' ? el('span', { class: 'side' }, SIDE_LABEL[item.side]) : null,
-    name);
+    name,
+    withLevel && item.level ? el('span', { class: 'lv' }, ` Lv${item.level}`) : null);
 }
 
 function recordsOn(key) {
@@ -146,7 +160,7 @@ function renderCalendar() {
     const MAX = 3;
     grid.append(el('button', { class: cls.join(' '), type: 'button', onclick: () => openDay(key) },
       el('span', { class: 'num' }, d.getDate()),
-      items.slice(0, MAX).map(itemChip),
+      items.slice(0, MAX).map(it => itemChip(it)),
       items.length > MAX ? el('span', { class: 'more' }, `+${items.length - MAX}`) : null,
     ));
   }
@@ -169,8 +183,8 @@ function recordCard(rec) {
   return el('div', { class: 'record-card', onclick: () => openRecord(rec) },
     el('div', { class: 'head' },
       el('span', {}, formatJP(rec.date)),
-      rec.place ? el('span', { class: 'place' }, rec.place) : null),
-    el('div', { class: 'chips' }, sortItems(rec.items).map(itemChip)),
+      rec.device ? el('span', { class: 'place' }, rec.device) : null),
+    el('div', { class: 'chips' }, sortItems(rec.items).map(it => itemChip(it, true))),
     rec.memo ? el('div', { class: 'memo' }, rec.memo) : null,
   );
 }
@@ -206,12 +220,16 @@ $('#add-on-day').addEventListener('click', () => {
 let editingId = null;
 // partId -> { L, R } (左右あり) / { N } (左右なし)
 let picks = {};
+// partId -> 出力レベル（文字列）
+let levels = {};
 
 function openRecord(rec, dateKey) {
   editingId = rec ? rec.id : null;
   picks = {};
+  levels = {};
   if (rec) {
     for (const it of rec.items) {
+      if (it.level) levels[it.partId] = it.level;
       const p = picks[it.partId] = picks[it.partId] || {};
       if (it.side === 'B') { p.L = true; p.R = true; }
       else p[it.side] = true;
@@ -219,16 +237,26 @@ function openRecord(rec, dateKey) {
   }
   $('#dialog-title').textContent = rec ? '記録を編集' : '記録を追加';
   $('#record-date').value = rec ? rec.date : (dateKey || todayKey());
-  $('#record-place').value = rec ? rec.place || '' : lastPlace();
+  $('#record-device').value = rec ? rec.device || '' : lastDevice();
   $('#record-memo').value = rec ? rec.memo || '' : '';
   $('#delete-record').hidden = !rec;
   renderPicker();
   $('#record-dialog').showModal();
 }
 
-function lastPlace() {
+function lastDevice() {
   const sorted = [...state.records].sort((a, b) => b.date.localeCompare(a.date));
-  return sorted.find(r => r.place)?.place || '';
+  return sorted.find(r => r.device)?.device || '';
+}
+
+// その部位で最後に使った出力レベル
+function lastLevel(partId) {
+  const sorted = [...state.records].sort((a, b) => b.date.localeCompare(a.date));
+  for (const r of sorted) {
+    const it = r.items.find(i => i.partId === partId && i.level);
+    if (it) return it.level;
+  }
+  return '';
 }
 
 function renderPicker() {
@@ -247,6 +275,24 @@ function renderPicker() {
       el('h4', {}, g),
       el('div', { class: 'items' }, parts.map(pickControl)),
     ));
+  }
+  renderLevels();
+}
+
+function renderLevels() {
+  const box = $('#level-inputs');
+  const selected = state.parts.filter(p => picks[p.id]);
+  box.replaceChildren();
+  if (!selected.length) return;
+  box.append(el('h4', {}, '出力レベル（任意・前回の値を自動入力）'));
+  for (const p of selected) {
+    if (!(p.id in levels)) levels[p.id] = lastLevel(p.id);
+    box.append(el('label', { class: 'level-row' },
+      el('span', {}, p.name),
+      el('input', {
+        type: 'text', inputmode: 'numeric', value: levels[p.id], placeholder: '例：3',
+        oninput: e => { levels[p.id] = e.target.value.trim(); },
+      })));
   }
 }
 
@@ -274,10 +320,11 @@ function pickControl(part) {
 function picksToItems() {
   const items = [];
   for (const [partId, p] of Object.entries(picks)) {
-    if (p.L && p.R) items.push({ partId, side: 'B' });
-    else if (p.L) items.push({ partId, side: 'L' });
-    else if (p.R) items.push({ partId, side: 'R' });
-    else if (p.N) items.push({ partId, side: 'N' });
+    const side = p.L && p.R ? 'B' : p.L ? 'L' : p.R ? 'R' : p.N ? 'N' : null;
+    if (!side) continue;
+    const item = { partId, side };
+    if (levels[partId]) item.level = levels[partId];
+    items.push(item);
   }
   return items;
 }
@@ -291,7 +338,7 @@ $('#record-form').addEventListener('submit', e => {
   }
   const data = {
     date: $('#record-date').value,
-    place: $('#record-place').value.trim(),
+    device: $('#record-device').value.trim(),
     memo: $('#record-memo').value.trim(),
     items,
   };
@@ -320,16 +367,19 @@ $('#delete-record').addEventListener('click', () => {
 // ---------- 部位別サマリー ----------
 
 function renderSummary() {
-  // partId:side -> 施術日の配列
+  // partId:side -> { 照射日 -> 出力レベル }
   const hist = new Map();
-  const push = (k, date) => {
-    if (!hist.has(k)) hist.set(k, []);
-    hist.get(k).push(date);
+  const push = (k, date, level) => {
+    if (!hist.has(k)) hist.set(k, new Map());
+    const m = hist.get(k);
+    if (level || !m.has(date)) m.set(date, level || '');
   };
   for (const r of state.records) {
     for (const it of r.items) {
-      if (it.side === 'B') { push(`${it.partId}:L`, r.date); push(`${it.partId}:R`, r.date); }
-      else push(`${it.partId}:${it.side}`, r.date);
+      if (it.side === 'B') {
+        push(`${it.partId}:L`, r.date, it.level);
+        push(`${it.partId}:R`, r.date, it.level);
+      } else push(`${it.partId}:${it.side}`, r.date, it.level);
     }
   }
 
@@ -346,21 +396,24 @@ function renderSummary() {
       rows.push(el('tr', { class: 'group-row' }, el('td', { colspan: 4 }, g)));
     }
     sides.forEach((s, i) => {
-      const dates = [...new Set(hist.get(`${p.id}:${s}`) || [])].sort();
+      const byDate = hist.get(`${p.id}:${s}`) || new Map();
+      const dates = [...byDate.keys()].sort();
       const last = dates[dates.length - 1];
+      const lastLv = last && byDate.get(last);
       let nextCell = '—';
       if (last) {
         const next = addDays(last, state.intervalDays);
         const left = diffDays(today, next);
-        const cls = left <= 0 ? 'due' : left <= 7 ? 'soon' : '';
-        const note = left <= 0 ? '（施術可能）' : `（あと${left}日）`;
+        const cls = left <= 0 ? 'due' : left <= 3 ? 'soon' : '';
+        const note = left <= 0 ? '（照射OK）' : `（あと${left}日）`;
         nextCell = el('span', { class: cls }, `${next.replaceAll('-', '/')} ${note}`);
       }
       rows.push(el('tr', {},
         el('td', {}, i === 0 ? p.name : '',
           s !== 'N' ? el('span', { class: `side-tag ${s}` }, ' ' + SIDE_LABEL[s]) : null),
         el('td', {}, `${dates.length}回`),
-        el('td', {}, last ? last.replaceAll('-', '/') : '—'),
+        el('td', {}, last ? last.replaceAll('-', '/') : '—',
+          lastLv ? el('span', { class: 'lv' }, ` Lv${lastLv}`) : null),
         el('td', {}, nextCell),
       ));
     });
@@ -455,7 +508,7 @@ $('#import-input').addEventListener('change', async e => {
     const s = JSON.parse(await file.text());
     if (!s || !Array.isArray(s.parts) || !Array.isArray(s.records)) throw new Error('形式が正しくありません');
     if (!confirm('現在のデータを読み込んだデータで置き換えます。よろしいですか？')) return;
-    state = { version: 1, intervalDays: 56, ...s };
+    state = migrate({ intervalDays: 14, ...s });
     save();
     renderAll();
   } catch (err) {
