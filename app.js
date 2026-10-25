@@ -23,7 +23,7 @@ function defaultState() {
   for (const [group, items] of DEFAULT_PARTS) {
     for (const [name, paired] of items) parts.push({ id: uid(), name, group, paired, archived: false });
   }
-  return { version: 2, intervalDays: 14, parts, records: [] };
+  return { version: 2, intervalDays: 7, parts, records: [] };
 }
 
 function loadState() {
@@ -42,7 +42,7 @@ function loadState() {
 // v1（サロン向け）→ v2（家庭用脱毛器向け）
 function migrate(s) {
   if ((s.version || 1) < 2) {
-    if (s.intervalDays === 56) s.intervalDays = 14;
+    if (s.intervalDays === 56) s.intervalDays = 7;
     for (const r of s.records) {
       if (r.place && !r.device) r.device = r.place;
       delete r.place;
@@ -508,7 +508,7 @@ $('#import-input').addEventListener('change', async e => {
     const s = JSON.parse(await file.text());
     if (!s || !Array.isArray(s.parts) || !Array.isArray(s.records)) throw new Error('形式が正しくありません');
     if (!confirm('現在のデータを読み込んだデータで置き換えます。よろしいですか？')) return;
-    state = migrate({ intervalDays: 14, ...s });
+    state = migrate({ intervalDays: 7, ...s });
     save();
     renderAll();
   } catch (err) {
