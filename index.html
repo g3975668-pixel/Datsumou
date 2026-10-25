@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#d9627f">
+  <title>脱毛カレンダー</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>脱毛カレンダー</h1>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="calendar" role="tab">カレンダー</button>
+      <button class="tab" data-view="summary" role="tab">部位別</button>
+      <button class="tab" data-view="settings" role="tab">設定</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- カレンダー -->
+    <section id="view-calendar" class="view active">
+      <div class="month-nav">
+        <button id="prev-month" aria-label="前の月">‹</button>
+        <h2 id="month-label"></h2>
+        <button id="next-month" aria-label="次の月">›</button>
+      </div>
+      <button id="today-btn" class="link-btn">今日へ</button>
+      <div class="weekdays">
+        <span class="sun">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="sat">土</span>
+      </div>
+      <div id="calendar-grid" class="calendar-grid"></div>
+      <div id="month-list" class="month-list"></div>
+    </section>
+
+    <!-- 部位別 -->
+    <section id="view-summary" class="view">
+      <p class="hint">部位ごとの施術回数・最終施術日・次回目安日です（左右は別々に集計）。</p>
+      <div id="summary-table"></div>
+    </section>
+
+    <!-- 設定 -->
+    <section id="view-settings" class="view">
+      <div class="card">
+        <h3>次回目安の間隔</h3>
+        <label class="row">前回から <input id="interval-input" type="number" min="1" max="365"> 日後</label>
+      </div>
+      <div class="card">
+        <h3>部位の管理</h3>
+        <ul id="part-list" class="part-list"></ul>
+        <form id="add-part-form" class="add-part">
+          <input id="new-part-name" type="text" placeholder="部位名（例：手の指）" required>
+          <input id="new-part-group" type="text" placeholder="グループ（例：腕）">
+          <label class="check"><input id="new-part-paired" type="checkbox" checked> 左右あり</label>
+          <button type="submit" class="primary">追加</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3>データ</h3>
+        <div class="row gap">
+          <button id="export-btn">エクスポート（JSON）</button>
+          <label class="file-btn">インポート<input id="import-input" type="file" accept="application/json" hidden></label>
+          <button id="reset-btn" class="danger">全データ削除</button>
+        </div>
+        <p class="hint">データはこの端末のブラウザ内（localStorage）に保存されます。</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- 記録ダイアログ -->
+  <dialog id="record-dialog">
+    <form id="record-form" method="dialog">
+      <h2 id="dialog-title">記録</h2>
+      <label class="row">日付 <input id="record-date" type="date" required></label>
+      <label class="row">サロン・クリニック <input id="record-place" type="text" placeholder="任意"></label>
+      <div class="side-legend">左右のある部位は「左」「右」をそれぞれ選べます（両方選ぶと両側）。</div>
+      <div id="part-picker" class="part-picker"></div>
+      <label class="block">メモ <textarea id="record-memo" rows="2" placeholder="出力・痛み・肌の状態など"></textarea></label>
+      <div class="dialog-actions">
+        <button type="button" id="delete-record" class="danger">削除</button>
+        <span class="spacer"></span>
+        <button type="button" id="cancel-record">キャンセル</button>
+        <button type="submit" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 日別一覧ダイアログ -->
+  <dialog id="day-dialog">
+    <div class="day-dialog-body">
+      <h2 id="day-title"></h2>
+      <div id="day-records"></div>
+      <div class="dialog-actions">
+        <button type="button" id="close-day">閉じる</button>
+        <span class="spacer"></span>
+        <button type="button" id="add-on-day" class="primary">＋ 記録を追加</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
